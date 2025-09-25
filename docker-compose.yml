@@ -1,0 +1,16 @@
+services:
+  api:
+    # ... seu serviço da API aqui ...
+  psql:
+    # ... seu Postgres aqui ...
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./frontend:/app
+    env_file:
+      - ./dotenv_files/frontend.env
+    depends_on:
+      - api
