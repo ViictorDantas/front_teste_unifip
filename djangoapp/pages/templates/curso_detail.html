@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Detalhes do Curso: {{ curso.nome }}{% endblock %}
 
 {% block content %}
@@ -14,7 +15,6 @@
   <div class="mb-3">
     <input type="text" id="disciplinaSearchInput" class="form-control" placeholder="Pesquisar disciplinas por nome ou código...">
   </div>
-  {% if disciplinas.results or disciplinas %}
   <div class="table-responsive" id="disciplinasTableContainer">
     <table class="table table-striped table-hover">
       <thead>
@@ -26,18 +26,20 @@
         </tr>
       </thead>
       <tbody>
-        {% for disciplina in disciplinas.results|default:disciplinas %}
-        <tr>
-          <td>{{ disciplina.codigo }}</td>
-          <td>{{ disciplina.nome }}</td>
-          <td>{{ disciplina.carga_horaria }}</td>
-          <td>{{ disciplina.ativo|yesno:"Sim,Não" }}</td>
-        </tr>
-        {% empty %}
+        {% if disciplinas.results or disciplinas %}
+          {% for disciplina in disciplinas.results|default:disciplinas %}
+          <tr>
+            <td>{{ disciplina.codigo }}</td>
+            <td>{{ disciplina.nome }}</td>
+            <td>{{ disciplina.carga_horaria }}</td>
+            <td>{{ disciplina.ativo|yesno:"Sim,Não" }}</td>
+          </tr>
+          {% endfor %}
+        {% else %}
         <tr>
           <td colspan="4" class="text-center">Nenhuma disciplina encontrada para este curso.</td>
         </tr>
-        {% endfor %}
+        {% endif %}
       </tbody>
       <tfoot>
         <tr>
@@ -51,87 +53,9 @@
       </tfoot>
     </table>
   </div>
-  {% else %}
-  <p>Nenhuma disciplina encontrada para este curso.</p>
-  {% endif %}
 {% endblock %}
 
 {% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const disciplinaSearchInput = document.getElementById('disciplinaSearchInput');
-    const disciplinasTableContainer = document.getElementById('disciplinasTableContainer');
-    const cursoId = "{{ curso.id }}";
-    const API_BASE_URL = "{{ API_BASE_URL }}";
-
-    let searchTimeout;
-
-    disciplinaSearchInput.addEventListener('keyup', function() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            filterDisciplinas(this.value);
-        }, 300); // Debounce de 300ms
-    });
-
-    async function filterDisciplinas(searchTerm) {
-        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        let url = `${API_BASE_URL}/cursos/${cursoId}/disciplinas/`;
-        if (searchTerm) {
-            url += `?search=${encodeURIComponent(searchTerm)}`;
-        }
-
-        try {
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'X-CSRFToken': csrftoken,
-                    'Authorization': `Bearer {{ request.session.access }}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`Erro ao buscar disciplinas: ${response.status}`);
-            }
-
-            const data = await response.json();
-            renderDisciplinas(data.results || data);
-
-        } catch (error) {
-            console.error('Erro ao buscar disciplinas:', error);
-            // Pode exibir uma mensagem de erro na UI se desejar
-        }
-    }
-
-    function renderDisciplinas(disciplinas) {
-        let tbodyHtml = '';
-        let totalDisciplinasAtivas = 0;
-        let somaCargaHorariaDisciplinasAtivas = 0;
-
-        if (disciplinas.length === 0) {
-            tbodyHtml = `
-                <tr>
-                    <td colspan="4" class="text-center">Nenhuma disciplina encontrada.</td>
-                </tr>
-            `;
-        } else {
-            disciplinas.forEach(d => {
-                totalDisciplinasAtivas++;
-                somaCargaHorariaDisciplinasAtivas += d.carga_horaria || 0;
-                tbodyHtml += `
-                    <tr>
-                        <td>${d.codigo}</td>
-                        <td>${d.nome}</td>
-                        <td>${d.carga_horaria}</td>
-                        <td>${d.ativo ? "Sim" : "Não"}</td>
-                    </tr>
-                `;
-            });
-        }
-
-        disciplinasTableContainer.querySelector('tbody').innerHTML = tbodyHtml;
-        disciplinasTableContainer.querySelector('tfoot tr:nth-child(1) td:nth-child(2)').textContent = totalDisciplinasAtivas;
-        disciplinasTableContainer.querySelector('tfoot tr:nth-child(2) td:nth-child(2)').textContent = `${somaCargaHorariaDisciplinasAtivas} horas`;
-    }
-});
-</script>
+{{ disciplinas|json_script:"disciplinas_data" }}
+<script src="{% static 'js/curso_detail.js' %}"></script>
 {% endblock %}

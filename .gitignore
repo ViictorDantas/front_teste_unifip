@@ -32,7 +32,9 @@ env.bak/
 db.sqlite3
 media/
 staticfiles/
-static/
+# static/
+**/static/
+!djangoapp/pages/static/
 
 # ==========================
 # IDEs e editores

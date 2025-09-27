@@ -27,7 +27,6 @@ def login_view(request):
                 'access'), tokens.get('refresh'))
             return redirect('index')
         except httpx.HTTPStatusError as e:
-            # Ajuda a debugar se der 400 novamente
             messages.error(
                 request, f"Login falhou: {e.response.status_code} - {e.response.text}")
         except Exception:
@@ -45,15 +44,13 @@ def index(request):
     if not access:
         return redirect('login')
 
-    # sua API expõe /cursos/ (com barra final)
     with get_client(access) as api:
         r = api.get('/cursos/')
         if r.status_code == 401 and refresh:
-            # tenta refresh 1x
             try:
                 new_tokens = refresh_token(refresh)
                 _save_tokens(request.session, new_tokens.get(
-                    'access'))  # mantém refresh antigo
+                    'access'))
                 r = get_client(new_tokens.get('access')).get('/cursos/')
             except Exception:
                 request.session.flush()
@@ -66,7 +63,7 @@ def index(request):
                     request, "Você não tem permissão para acessar os cursos.")
                 request.session.flush()
                 return redirect('login')
-            raise  # Re-raise other HTTPStatusErrors
+            raise
         cursos = r.json()
 
     return render(request, 'index.html', {'cursos': cursos, 'API_BASE_URL': settings.API_BASE_URL})
@@ -82,18 +79,24 @@ def curso_detail_view(request, pk):
 
     try:
         with get_client(access) as api:
-            # Fetch course details
             curso_response = api.get(f'{settings.API_BASE_URL}/cursos/{pk}/')
             curso_response.raise_for_status()
             curso = curso_response.json()
 
-            # Fetch disciplines for the course
-            disciplinas_response = api.get(
-                f'{settings.API_BASE_URL}/cursos/{pk}/disciplinas/')
-            disciplinas_response.raise_for_status()
-            disciplinas = disciplinas_response.json()
+            disciplinas = []
+            try:
+                disciplinas_url = f'{settings.API_BASE_URL}/disciplinas/?curso={pk}'
+                disciplinas_response = api.get(disciplinas_url)
+                disciplinas_response.raise_for_status()
+                disciplinas = disciplinas_response.json()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    messages.info(
+                        request, "Nenhuma disciplina encontrada para este curso.")
+                    disciplinas = []
+                else:
+                    raise
 
-            # Calculate total disciplines and sum of workloads
             total_disciplinas_ativas = 0
             soma_carga_horaria_disciplinas_ativas = 0
             if disciplinas.get('results'):
